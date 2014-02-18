@@ -1,62 +1,57 @@
+# License : GPLv2 , google it
 
+import rb, os
+from gi.repository import RB, Gtk, Gio, GObject, PeasGtk, GConf
 
-from os import system, path
-
-import rb
-from gi.repository import RB, Gtk, Gio, GObject, PeasGtk
-
-import gettext
-gettext.install('rhythmbox', RB.locale_dir())
+MY_GCONF_PREFIX = "/org/gnome/rhythmbox/plugins/playlists_ie/"
+conf = GConf.Client.get_default()
 
 class PlaylistsIOConfigureDialog (GObject.Object, PeasGtk.Configurable):
-	__gtype_name__ = 'PlaylistsIOConfigureDialog'
-	object = GObject.property(type=GObject.Object)
+    __gtype_name__ = 'PlaylistsIOConfigureDialog'
+    object = GObject.property(type=GObject.Object)
 
-	def __init__(self):
-		GObject.Object.__init__(self)
-		self.settings = Gio.Settings("org.gnome.rhythmbox.plugins.playlists_ie")
+    def __init__(self):
+        GObject.Object.__init__(self)
+#        conf = GConf.Client.get_default()
+        folder = conf.get_string(MY_GCONF_PREFIX+"folder")
+        if folder is None:
+            conf.set_string(MY_GCONF_PREFIX+"folder",os.getcwd()+"playlists_import_export")
 
-	def do_create_configure_widget(self):
-		builder = Gtk.Builder()
-		builder.add_from_file(rb.find_plugin_file(self, "playlists_ie_prefs.ui"))
+    def do_create_configure_widget(self):
+        builder = Gtk.Builder()
+        builder.add_from_file( "playlists_ie_prefs.ui") #rb.find_plugin_file(self,)
 
-		self.config = builder.get_object("config")
+        self.config = builder.get_object("config")
 
-		self.choose_button = builder.get_object("choose_button")
-		self.path_display = builder.get_object("path_display")
+        self.choose_button = builder.get_object("choose_button")
+        self.path_display = builder.get_object("path_display")
 
-		self.choose_button.connect("clicked", self.choose_callback)
+        self.choose_button.connect("clicked", self.choose_callback)
 
-		self.folder = self.get_prefs()
-		if self.folder is None:
-			self.folder = '~/.playlists_ie'
-		self.path_display.set_text(self.folder)
+#        conf = GConf.Client.get_default()
 
-		return self.config
+        folder = conf.get_string(MY_GCONF_PREFIX+"folder")
+        self.path_display.set_text(folder)
 
-	def choose_callback(self, widget):
-		def response_handler(widget, response):
-			if response == Gtk.ResponseType.OK:
-				path = self.chooser.get_filename()
-				self.chooser.destroy()
-				self.path_display.set_text(path)
-				self.settings['folder'] = path
-			else:
-				self.chooser.destroy()
+        return self.config
 
-		buttons = (Gtk.STOCK_CLOSE, Gtk.ResponseType.CLOSE,
-				Gtk.STOCK_OK, Gtk.ResponseType.OK)
-		self.chooser = Gtk.FileChooserDialog(title=_("Choose lyrics folder..."),
-					parent=None,
-					action=Gtk.FileChooserAction.SELECT_FOLDER,
-					buttons=buttons)
-		self.chooser.connect("response", response_handler)
-		self.chooser.set_modal(True)
-		self.chooser.set_transient_for(self.config.get_toplevel())
-		self.chooser.present()
+    def choose_callback(self, widget):
+        def response_handler(widget, response):
+            if response == Gtk.ResponseType.OK:
+                path = self.chooser.get_filename()
+                self.chooser.destroy()
+                self.path_display.set_text(path)
+                conf.set_string(MY_GCONF_PREFIX+"folder",path)
+            else:
+                self.chooser.destroy()
 
-	def get_prefs (self):
-		folder = self.settings['folder']
-
-		print("playlists_ie folder: " + folder)
-		return (folder)
+        buttons = (Gtk.STOCK_CLOSE, Gtk.ResponseType.CLOSE,
+                Gtk.STOCK_OK, Gtk.ResponseType.OK)
+        self.chooser = Gtk.FileChooserDialog(title=_("Choose lyrics folder..."),
+                    parent=None,
+                    action=Gtk.FileChooserAction.SELECT_FOLDER,
+                    buttons=buttons)
+        self.chooser.connect("response", response_handler)
+        self.chooser.set_modal(True)
+        self.chooser.set_transient_for(self.config.get_toplevel())
+        self.chooser.present()

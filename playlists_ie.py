@@ -1,13 +1,12 @@
 # License : GPLv2 , google it
 
-#TODO: import on startup (there's a bug - we have to wait for stuff to load first) 
-#      autoexport on runtime playlist changes
-#      skip automatic playlists
-
-import os, re, rb, logging
-from gi.repository import Gio, GObject, Peas, RB
+import os, rb, logging
+from gi.repository import Gio, GObject, Peas, RB, GConf
 
 from playlists_ie_prefs import PlaylistsIOConfigureDialog
+
+MY_GCONF_PREFIX = "/org/gnome/rhythmbox/plugins/playlists_ie/"
+conf = GConf.Client.get_default()
 
 class PlaylistLoadSavePlugin(GObject.Object, Peas.Activatable):
     __gtype_name__ = 'PlaylistLoadSavePlugin'
@@ -15,6 +14,9 @@ class PlaylistLoadSavePlugin(GObject.Object, Peas.Activatable):
 
     def __init__ (self):
         GObject.Object.__init__ (self)
+        folder = conf.get_string(MY_GCONF_PREFIX+"folder")
+        if folder is None:
+            conf.set_string(MY_GCONF_PREFIX+"folder",os.getcwd()+"playlists_import_export")
 
     def do_activate (self):
         #self.import_playlists()
@@ -38,7 +40,6 @@ class PlaylistLoadSavePlugin(GObject.Object, Peas.Activatable):
 
     def do_deactivate (self):
         shell = self.object
-            
         app = shell.props.application
         app.remove_plugin_menu_item("view", "import-playlists")
         app.remove_plugin_menu_item("view", "export-playlists")
@@ -48,48 +49,38 @@ class PlaylistLoadSavePlugin(GObject.Object, Peas.Activatable):
         self.action2 = None
 
     def import_playlists(self, action, parameter, shell):
+        folder = conf.get_string(MY_GCONF_PREFIX+"folder")
         pl_man = shell.props.playlist_manager
         
-        count = 0
-        
         for playlist in pl_man.get_playlists():
-            count = count + 1
+
             if( isinstance(playlist, RB.AutoPlaylistSource) ):
                 if( playlist.props.name == "Unnamed playlist" ):
                     playlist.props.name = "Unnamed playlist_"
             else :            
                 #logging.error("deleting " + playlist.props.name)
                 pl_man.delete_playlist(playlist.props.name)
-
-        print(count)
         
-        for plfile in os.listdir("/sync/Music/playlists"):
+        for plfile in os.listdir(folder):
             if plfile.endswith(".m3u"):
                 pl_name = plfile[:-4]
-                pl_uri = "file:///sync/Music/playlists/"+plfile
+                pl_uri = os.path.join(folder,pl_name)
+                pl_uri = "file://"+ pl_uri + ".m3u"
                 pl_man.parse_file(pl_uri)
-                #logging.error("importing "+pl_name)  
-                
-                #add a dummy playlist, because the last imported will 
-                #pl_man.new_playlist("dummy_dummy_dummy")            
+                #logging.error("importing "+pl_uri)  
                 
                 for playlist in pl_man.get_playlists():
                     if(playlist.props.name == "Unnamed playlist"):
                         playlist.props.name = pl_name
-                
-                #pl_man.delete_playlist("dummy_dummy_dummy")
 
     def export_playlists(self, action, parameter, shell):
+        folder = conf.get_string(MY_GCONF_PREFIX+"folder")
         pl_man = shell.props.playlist_manager
 
         for playlist in pl_man.get_playlists():
             if( isinstance(playlist, RB.StaticPlaylistSource) ):
                 pl_name = playlist.props.name
-                pl_uri = "file:///sync/Music/playlists/" + pl_name
-                pl_uri = pl_uri + ".m3u"
+                pl_uri = os.path.join(folder,pl_name)
+                pl_uri = "file://"+ pl_uri + ".m3u"
                 #logging.error("exporting "+pl_name) 
                 pl_man.export_playlist(pl_name,pl_uri,1);
-            
-
-#connect to changes in playl
-
