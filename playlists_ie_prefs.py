@@ -19,7 +19,7 @@ class PlaylistsIOConfigureDialog (GObject.Object, PeasGtk.Configurable):
 
     def do_create_configure_widget(self):
         builder = Gtk.Builder()
-        builder.add_from_file( "playlists_ie_prefs.ui") #rb.find_plugin_file(self,)
+        builder.add_from_file( os.path.abspath("./playlists_ie_prefs.ui") ) #rb.find_plugin_file(self,)
 
         self.config = builder.get_object("config")
 
