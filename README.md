@@ -22,5 +22,5 @@ TODO
       
 Change log
 --------------------
-1.0.0 Initial release
-1.0.1 Bugfix: finding the .ui file on some runs was failing
+- 1.0.0 Initial release
+- 1.0.1 Bugfix: finding the .ui file on some runs was failing
