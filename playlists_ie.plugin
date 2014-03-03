@@ -2,7 +2,8 @@
 Loader=python3
 Module=playlists_ie
 IAge=2
-Depends=rb
 Name=Playlists import/export
-Description=Sync the RB playlists with a folder of m3u playlists
-Authors=Petko Ditchev
+Depends=rb
+Description=Sync the static RB playlists with a folder of m3u playlists
+Authors=Petko Ditchev<pditchev@gmail.com>
+Website=https://github.com/petko10/rhythmbox-plugin-playlists-import-export
