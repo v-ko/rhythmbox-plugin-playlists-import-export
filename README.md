@@ -9,6 +9,8 @@ Installation
 - Just get all the files and drop them in /home/user/.local/share/rhythmbox/plugins
 - Then restart Rhythmbox
 
+- On Ubuntu you might need to install the package gir1.2-gconf-2.0
+
 Usage
 --------------------
 - In the RB menu click Plugins, select the plugin, click Preferences and choose the directory you want to import from or export to. (the default one is /home/user/playlists_import_export)
