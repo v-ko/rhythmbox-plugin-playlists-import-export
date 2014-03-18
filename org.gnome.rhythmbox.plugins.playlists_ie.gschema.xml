@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+    <schema path="/org/gnome/rhythmbox/plugins/playlists_ie/" id="org.gnome.rhythmbox.plugins.playlists_ie">
+        <key type="s" name="ie-folder">
+            <default>""</default>
+            <summary>Folder to import to or export from.</summary>
+            <description>Defines the folder that the batch operations are applied to/from. There is no recursion into subfolders.</description>
+        </key>
+    </schema>
+</schemalist>

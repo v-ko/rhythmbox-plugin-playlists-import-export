@@ -11,13 +11,10 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import os, rb, logging
-from gi.repository import Gio, GObject, Peas, RB, GConf
+import os, rb, logging, time
+from gi.repository import Gio, GObject, Peas, RB, GConf, Gtk
 
 from playlists_ie_prefs import PlaylistsIOConfigureDialog
-
-MY_GCONF_PREFIX = "/org/gnome/rhythmbox/plugins/playlists_ie/"
-conf = GConf.Client.get_default()
 
 class PlaylistLoadSavePlugin(GObject.Object, Peas.Activatable):
     __gtype_name__ = 'PlaylistLoadSavePlugin'
@@ -25,23 +22,20 @@ class PlaylistLoadSavePlugin(GObject.Object, Peas.Activatable):
 
     def __init__ (self):
         GObject.Object.__init__ (self)
-        folder = conf.get_string(MY_GCONF_PREFIX+"folder")
-        if folder is None:
-            conf.set_string(MY_GCONF_PREFIX+"folder",os.getcwd()+"playlists_import_export")
 
     def do_activate (self):
         #self.import_playlists()
         shell = self.object    
         app = shell.props.application
-        window = shell.props.window        
+        self.window = shell.props.window
         
         self.action1 = Gio.SimpleAction.new("import-playlists", None)
         self.action1.connect("activate", self.import_playlists, shell)
         self.action2 = Gio.SimpleAction.new("export-playlists", None)
         self.action2.connect("activate", self.export_playlists, shell)
         
-        window.add_action(self.action1)
-        window.add_action(self.action2)
+        self.window.add_action(self.action1)
+        self.window.add_action(self.action2)
         
         item1 = Gio.MenuItem.new(label=_("Import playlists"), detailed_action="win.import-playlists")
         item2 = Gio.MenuItem.new(label=_("Export playlists"), detailed_action="win.export-playlists")
@@ -60,38 +54,123 @@ class PlaylistLoadSavePlugin(GObject.Object, Peas.Activatable):
         self.action2 = None
 
     def import_playlists(self, action, parameter, shell):
-        folder = conf.get_string(MY_GCONF_PREFIX+"folder")
-        pl_man = shell.props.playlist_manager
-        
-        for playlist in pl_man.get_playlists():
+        settings = Gio.Settings.new("org.gnome.rhythmbox.plugins.playlists_ie")
+        folder = settings.get_string("ie-folder") #get the import-export folder
+        if (os.path.isdir(folder)!=True):
+            self.warn_for_no_present_dir()
+            return
 
-            if( isinstance(playlist, RB.AutoPlaylistSource) ):
-                if( playlist.props.name == "Unnamed playlist" ):
+        self.create_progress_bar_win()
+        pl_man = shell.props.playlist_manager
+        pl_list = pl_man.get_playlists()
+        pl_count = len(pl_list)
+        processed_pl_count=0
+
+        for playlist in pl_list:
+
+            while Gtk.events_pending():
+                Gtk.main_iteration()
+
+            if( isinstance(playlist, RB.AutoPlaylistSource) ): #keep only auto playlists
+                if( playlist.props.name == "Unnamed playlist" ): #this name is used for the newly imported playlists
                     playlist.props.name = "Unnamed playlist_"
             else :            
                 #logging.error("deleting " + playlist.props.name)
                 pl_man.delete_playlist(playlist.props.name)
         
-        for plfile in os.listdir(folder):
-            if plfile.endswith(".m3u"):
-                pl_name = plfile[:-4]
+            processed_pl_count=processed_pl_count+1
+            self.update_fraction(1-processed_pl_count/pl_count)
+
+        pl_file_count=0
+        processed_pl_files=0
+
+        for pl_file in os.listdir(folder):
+
+            if pl_file.endswith(".m3u"):
+                pl_file_count=pl_file_count+1
+
+        for pl_file in os.listdir(folder):
+
+            while Gtk.events_pending():
+                Gtk.main_iteration()
+
+            if pl_file.endswith(".m3u"):
+                pl_name = pl_file[:-4]
                 pl_uri = os.path.join(folder,pl_name)
                 pl_uri = "file://"+ pl_uri + ".m3u"
                 pl_man.parse_file(pl_uri)
                 #logging.error("importing "+pl_uri)  
                 
                 for playlist in pl_man.get_playlists():
-                    if(playlist.props.name == "Unnamed playlist"):
+                    if(playlist.props.name == "Unnamed playlist"): #that's the one we imported last , so set it's name
                         playlist.props.name = pl_name
 
-    def export_playlists(self, action, parameter, shell):
-        folder = conf.get_string(MY_GCONF_PREFIX+"folder")
-        pl_man = shell.props.playlist_manager
+                processed_pl_files=processed_pl_files+1
+                self.update_fraction(processed_pl_files/pl_file_count)
 
-        for playlist in pl_man.get_playlists():
+        self.progress_window.destroy()
+
+    def export_playlists(self, action, parameter, shell):
+        settings = Gio.Settings.new("org.gnome.rhythmbox.plugins.playlists_ie")
+        folder = settings.get_string("ie-folder") #get the import-export folder
+        if (os.path.isdir(folder)!=True):
+            self.warn_for_no_present_dir()
+            return
+
+        pl_man = shell.props.playlist_manager
+        self.create_progress_bar_win()
+
+        pl_list = pl_man.get_playlists()
+        pl_count = len(pl_list)
+        processed_pl_count=0
+
+        for playlist in pl_list:
+
+            while Gtk.events_pending():
+                Gtk.main_iteration()
+
             if( isinstance(playlist, RB.StaticPlaylistSource) ):
                 pl_name = playlist.props.name
                 pl_uri = os.path.join(folder,pl_name)
                 pl_uri = "file://"+ pl_uri + ".m3u"
                 #logging.error("exporting "+pl_name) 
                 pl_man.export_playlist(pl_name,pl_uri,1);
+
+                processed_pl_count=processed_pl_count+1
+                self.update_fraction(processed_pl_count/pl_count)
+
+        self.progress_window.destroy()
+
+    def warn_for_no_present_dir(self):
+
+        #logging.error("reached warning for dir")
+        messagedialog = Gtk.MessageDialog(parent=self.window,
+                                          flags=Gtk.DialogFlags.MODAL,
+                                          type=Gtk.MessageType.WARNING,
+                                          buttons=Gtk.ButtonsType.OK,
+                                          message_format="Please first select a valid directory. (Plugins->Preferences)")
+        messagedialog.connect("response", self.destroy_warning)
+        messagedialog.show()
+
+    def destroy_warning(arg1,widget,arg3):
+        widget.destroy()
+
+    def create_progress_bar_win(self):
+
+        self.progress_window = Gtk.Dialog(title="Import/export progress",
+                                          parent=self.window)
+
+        self.progress_bar = Gtk.ProgressBar()
+        self.progress_window.get_content_area().add(self.progress_bar)
+        self.progress_window.get_action_area().set_size_request(1,-1)
+
+        #self.progress_window.set_transient_for(self.window)
+        self.progress_window.set_modal(True)
+        self.progress_window.resize(500,30)
+        self.progress_window.show_all()
+
+
+    def update_fraction(self, fraction):
+
+        self.progress_bar.pulse()
+        self.progress_bar.set_fraction(fraction)
