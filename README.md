@@ -14,11 +14,6 @@ Usage
 - In the RB menu click Plugins, select the plugin, click Preferences and choose the directory you want to import from or export to. (the default one is /home/user/playlists_import_export)
 - Use the 'Import/Export playlists' buttons in the Tools menu
 
-TODO
---------------------
-- import on startup (there's a bug - we have to wait for stuff to load first) (by timestamp ?)
-- autoexport on runtime playlist changes (+switch autoexport on/off)
-
 Change log
 --------------------
 - 1.0.0 Initial release
