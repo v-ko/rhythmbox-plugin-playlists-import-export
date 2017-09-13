@@ -12,7 +12,7 @@
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import rb, os
-from gi.repository import RB, Gtk, Gio, GObject, PeasGtk, GConf
+from gi.repository import RB, Gtk, Gio, GObject, PeasGtk
 
 class PlaylistsIOConfigureDialog (GObject.Object, PeasGtk.Configurable):
     __gtype_name__ = 'PlaylistsIOConfigureDialog'

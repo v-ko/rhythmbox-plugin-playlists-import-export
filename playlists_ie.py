@@ -12,7 +12,7 @@
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import os, rb, logging, time
-from gi.repository import Gio, GObject, Peas, RB, GConf, Gtk
+from gi.repository import Gio, GObject, Peas, RB, Gtk
 
 from playlists_ie_prefs import PlaylistsIOConfigureDialog
 
@@ -25,21 +25,21 @@ class PlaylistLoadSavePlugin(GObject.Object, Peas.Activatable):
 
     def do_activate (self):
         #self.import_playlists()
-        shell = self.object    
+        shell = self.object
         app = shell.props.application
         self.window = shell.props.window
-        
+
         self.action1 = Gio.SimpleAction.new("import-playlists", None)
         self.action1.connect("activate", self.import_playlists, shell)
         self.action2 = Gio.SimpleAction.new("export-playlists", None)
         self.action2.connect("activate", self.export_playlists, shell)
-        
+
         self.window.add_action(self.action1)
         self.window.add_action(self.action2)
-        
+
         item1 = Gio.MenuItem.new(label=_("Import playlists"), detailed_action="win.import-playlists")
         item2 = Gio.MenuItem.new(label=_("Export playlists"), detailed_action="win.export-playlists")
-        
+
         app.add_plugin_menu_item("tools","import-playlists",item1)
         app.add_plugin_menu_item("tools","export-playlists",item2)
 
@@ -74,10 +74,10 @@ class PlaylistLoadSavePlugin(GObject.Object, Peas.Activatable):
             if( isinstance(playlist, RB.AutoPlaylistSource) ): #keep only auto playlists
                 if( playlist.props.name == "Unnamed playlist" ): #this name is used for the newly imported playlists
                     playlist.props.name = "Unnamed playlist_"
-            else :            
+            else :
                 #logging.error("deleting " + playlist.props.name)
                 pl_man.delete_playlist(playlist.props.name)
-        
+
             processed_pl_count=processed_pl_count+1
             self.update_fraction(1-processed_pl_count/pl_count)
 
@@ -99,8 +99,8 @@ class PlaylistLoadSavePlugin(GObject.Object, Peas.Activatable):
                 pl_uri = os.path.join(folder,pl_name)
                 pl_uri = "file://"+ pl_uri + ".m3u"
                 pl_man.parse_file(pl_uri)
-                #logging.error("importing "+pl_uri)  
-                
+                #logging.error("importing "+pl_uri)
+
                 for playlist in pl_man.get_playlists():
                     if(playlist.props.name == "Unnamed playlist"): #that's the one we imported last , so set it's name
                         playlist.props.name = pl_name
@@ -133,7 +133,7 @@ class PlaylistLoadSavePlugin(GObject.Object, Peas.Activatable):
                 pl_name = playlist.props.name
                 pl_uri = os.path.join(folder,pl_name)
                 pl_uri = "file://"+ pl_uri + ".m3u"
-                #logging.error("exporting "+pl_name) 
+                #logging.error("exporting "+pl_name)
                 pl_man.export_playlist(pl_name,pl_uri,1);
 
                 processed_pl_count=processed_pl_count+1
