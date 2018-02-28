@@ -110,6 +110,58 @@ class PlaylistLoadSavePlugin(GObject.Object, Peas.Activatable):
 
         self.progress_window.destroy()
 
+    def import_single_playlist(self, playlist, shell):
+        settings = Gio.Settings.new("org.gnome.rhythmbox.plugins.playlists_ie")
+        folder = settings.get_string("ie-folder")  # get the import-export folder
+        if not os.path.isdir(folder):
+            self.warn_for_no_present_dir()
+            return
+
+        pl_man = shell.props.playlist_manager
+
+        pl_file_count = 0
+        processed_pl_files = 0
+
+        for pl_file in os.listdir(folder):
+
+            if pl_file.lower().endswith(".m3u") and pl_file[:-4] == playlist:
+                pl_file_count = pl_file_count + 1
+
+        self.create_progress_bar_win()
+        for pl_file in os.listdir(folder):
+            while Gtk.events_pending():
+                Gtk.main_iteration()
+
+            if pl_file.lower().endswith(".m3u") and pl_file[:-4] == playlist:
+                pl_man.delete_playlist(playlist)
+                pl_name = pl_file[:-4]
+                pl_uri = os.path.join(folder, pl_name)
+                pl_uri = "file://" + pl_uri + ".m3u"
+                pl_man.parse_file(pl_uri)
+                logging.info("importing " + pl_uri)
+
+                for playlist in pl_man.get_playlists():
+                    if playlist.props.name == "Unnamed playlist":  # that's the one we imported last , so set it's name
+                        playlist.props.name = pl_name
+
+                processed_pl_files = processed_pl_files + 1
+
+        self.progress_window.destroy()
+
+    def update_playlist(self, action, parameter, shell):
+        """ get your currently seleced playlist and run import_single_playlist """
+        page = shell.props.selected_page
+        if not hasattr(page, "get_entry_view"):
+            return
+        pagetype = shell.props.selected_page.get_name()
+        playlist = shell.props.selected_page.get_property('name')
+        # self.process_selection(selection)
+        if pagetype == 'RBStaticPlaylistSource':
+            self.import_single_playlist(playlist, shell)
+        else:
+            self.warn_not_a_playlist()
+        return
+
     def export_playlists(self, action, parameter, shell):
         settings = Gio.Settings.new("org.gnome.rhythmbox.plugins.playlists_ie")
         folder = settings.get_string("ie-folder") #get the import-export folder
