@@ -11,8 +11,9 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import rb, os
+import rb
 from gi.repository import RB, Gtk, Gio, GObject, PeasGtk
+
 
 class PlaylistsIOConfigureDialog (GObject.Object, PeasGtk.Configurable):
     __gtype_name__ = 'PlaylistsIOConfigureDialog'
@@ -20,10 +21,13 @@ class PlaylistsIOConfigureDialog (GObject.Object, PeasGtk.Configurable):
 
     def __init__(self):
         GObject.Object.__init__(self)
+        self.config = None
+        self.choose_button = None
+        self.path_display = None
 
     def do_create_configure_widget(self):
         builder = Gtk.Builder()
-        builder.add_from_file( rb.find_plugin_file(self, "playlists_ie_prefs.ui") )
+        builder.add_from_file(rb.find_plugin_file(self, "playlists_ie_prefs.ui"))
 
         self.config = builder.get_object("config")
 
@@ -34,7 +38,7 @@ class PlaylistsIOConfigureDialog (GObject.Object, PeasGtk.Configurable):
         self.path_display.connect("changed", self.path_changed_callback)
 
         settings = Gio.Settings.new("org.gnome.rhythmbox.plugins.playlists_ie")
-        folder = settings.get_string("ie-folder") #get the import-export folder
+        folder = settings.get_string("ie-folder")  # get the import-export folder
 
         self.path_display.set_text(folder)
 
@@ -51,18 +55,18 @@ class PlaylistsIOConfigureDialog (GObject.Object, PeasGtk.Configurable):
                 self.chooser.destroy()
 
         buttons = (Gtk.STOCK_CLOSE, Gtk.ResponseType.CLOSE,
-                Gtk.STOCK_OK, Gtk.ResponseType.OK)
-        self.chooser = Gtk.FileChooserDialog(title=_("Choose folder for import/export..."),
-                    parent=None,
-                    action=Gtk.FileChooserAction.SELECT_FOLDER,
-                    buttons=buttons)
+                   Gtk.STOCK_OK, Gtk.ResponseType.OK)
+        self.chooser = Gtk.FileChooserDialog(title="Choose folder for import/export...",
+                                             parent=None,
+                                             action=Gtk.FileChooserAction.SELECT_FOLDER,
+                                             buttons=buttons)
         self.chooser.connect("response", response_handler)
         self.chooser.set_modal(True)
         self.chooser.set_transient_for(self.config.get_toplevel())
         self.chooser.present()
 
     def path_changed_callback(self, widget):
-        path = self.path_display.get_text();
+        path = self.path_display.get_text()
 
         settings = Gio.Settings.new("org.gnome.rhythmbox.plugins.playlists_ie")
-        settings.set_string("ie-folder",path) #get the import-export folder
+        settings.set_string("ie-folder", path)  # get the import-export folder
