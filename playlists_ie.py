@@ -236,7 +236,7 @@ class PlaylistLoadSavePlugin(GObject.Object, Peas.Activatable):
         messagedialog.connect("response", self.destroy_warning)
         messagedialog.show()
 
-    def destroy_warning(self, arg1, widget, arg3):
+    def destroy_warning(self, widget, arg1):
         widget.destroy()
 
     def create_progress_bar_win(self):
