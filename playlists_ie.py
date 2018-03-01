@@ -23,6 +23,7 @@ from playlists_ie_prefs import PlaylistsIOConfigureDialog
 class PlaylistLoadSavePlugin(GObject.Object, Peas.Activatable):
     __gtype_name__ = 'PlaylistLoadSavePlugin'
     object = GObject.property(type=GObject.Object)
+    _menu_names = ['playlist-popup']
 
     def __init__(self):
         GObject.Object.__init__(self)
@@ -62,6 +63,16 @@ class PlaylistLoadSavePlugin(GObject.Object, Peas.Activatable):
         app.add_plugin_menu_item("tools", "import-playlists", item1)
         app.add_plugin_menu_item("tools", "export-playlists", item2)
         app.add_plugin_menu_item("tools", "update-playlist", item3)
+        
+        # create menu item for rightclick in playlist view
+        item = Gio.MenuItem()
+        item.set_label("Update this playlist")
+        item.set_detailed_action("app.update-playlist")
+
+        # add plugin menu item
+        for menu_name in PlaylistLoadSavePlugin._menu_names:
+            app.add_plugin_menu_item(menu_name, "Update this playlist", item)
+        app.add_action(self.action3)
 
     def do_deactivate(self):
         shell = self.object
@@ -72,6 +83,7 @@ class PlaylistLoadSavePlugin(GObject.Object, Peas.Activatable):
         app.remove_action("export-playlists")
         self.action1 = None
         self.action2 = None
+        self.action3 = None
 
     def import_playlists(self, action, parameter, shell):
         settings = Gio.Settings.new("org.gnome.rhythmbox.plugins.playlists_ie")
@@ -130,7 +142,7 @@ class PlaylistLoadSavePlugin(GObject.Object, Peas.Activatable):
 
         self.progress_window.destroy()
 
-    def import_single_playlist(self, playlist, shell):
+        def import_single_playlist(self, playlist, shell):
         settings = Gio.Settings.new("org.gnome.rhythmbox.plugins.playlists_ie")
         folder = settings.get_string("ie-folder")  # get the import-export folder
         if not os.path.isdir(folder):
@@ -138,14 +150,7 @@ class PlaylistLoadSavePlugin(GObject.Object, Peas.Activatable):
             return
 
         pl_man = shell.props.playlist_manager
-
-        pl_file_count = 0
         processed_pl_files = 0
-
-        for pl_file in os.listdir(folder):
-
-            if pl_file.lower().endswith(".m3u") and pl_file[:-4] == playlist:
-                pl_file_count = pl_file_count + 1
 
         self.create_progress_bar_win()
         for pl_file in os.listdir(folder):
@@ -161,15 +166,19 @@ class PlaylistLoadSavePlugin(GObject.Object, Peas.Activatable):
                 logging.info("importing " + pl_uri)
 
                 for playlist in pl_man.get_playlists():
-                    if playlist.props.name == "Unnamed playlist":  # that's the one we imported last , so set it's name
+                    if playlist.props.name == "Unnamed playlist":  # that's the one we imported last, so set it's name
                         playlist.props.name = pl_name
 
                 processed_pl_files = processed_pl_files + 1
+            # there is always one file
+            self.update_fraction(processed_pl_files / 1)
 
+        while Gtk.events_pending():
+            Gtk.main_iteration()
         self.progress_window.destroy()
 
     def update_playlist(self, action, parameter, shell):
-        """ get your currently seleced playlist and run import_single_playlist """
+        """ get your currently selected playlist and run import_single_playlist """
         page = shell.props.selected_page
         if not hasattr(page, "get_entry_view"):
             return
