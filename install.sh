@@ -76,8 +76,8 @@ rm "${PLUGIN_PATH}${SCRIPT_NAME}"
 #cd po; sudo ./lang.sh /usr/share/locale/
 
 #install the glib schema
-echo "Installing the glib schema (password needed)"
-sudo cp "${PLUGIN_PATH}${GLIB_SCHEME}" "$GLIB_DIR"
-sudo glib-compile-schemas "$GLIB_DIR"
+if [ ! -f $GLIB_DIR$GLIB_SCHEME ]; then
+    echo "Installing the glib schema (password needed)" && sudo cp "${PLUGIN_PATH}${GLIB_SCHEME}" "$GLIB_DIR" && sudo glib-compile-schemas "$GLIB_DIR"
+fi
 
 read -p "Script execution ended, press [Enter] key to exit..."
