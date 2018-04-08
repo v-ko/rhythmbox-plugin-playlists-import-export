@@ -142,7 +142,7 @@ class PlaylistLoadSavePlugin(GObject.Object, Peas.Activatable):
 
         self.progress_window.destroy()
 
-        def import_single_playlist(self, playlist, shell):
+    def import_single_playlist(self, playlist, shell):
         settings = Gio.Settings.new("org.gnome.rhythmbox.plugins.playlists_ie")
         folder = settings.get_string("ie-folder")  # get the import-export folder
         if not os.path.isdir(folder):
