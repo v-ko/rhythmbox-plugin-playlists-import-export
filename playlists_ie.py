@@ -96,10 +96,12 @@ class PlaylistLoadSavePlugin(GObject.Object, Peas.Activatable):
         self.create_progress_bar_win()
         pl_man = shell.props.playlist_manager
         pl_list = pl_man.get_playlists()
+        pl_names = []
         pl_count = len(pl_list)
         processed_pl_count = 0
 
         for playlist in pl_list:
+            pl_names.append(playlist.props.name)
 
             while Gtk.events_pending():
                 Gtk.main_iteration()
@@ -128,7 +130,7 @@ class PlaylistLoadSavePlugin(GObject.Object, Peas.Activatable):
 
             while Gtk.events_pending():
                 Gtk.main_iteration()
-            if importskip and pl_file[:-4] in pl_man.get_playlists():
+            if importskip and pl_file[:-4] in pl_names:
                 logging.error("Skipping file import " + pl_file)
             elif pl_file.endswith(".m3u"):
                 pl_name = pl_file[:-4]
@@ -253,7 +255,8 @@ class PlaylistLoadSavePlugin(GObject.Object, Peas.Activatable):
         widget.destroy()
 
     def create_progress_bar_win(self):
-
+        while Gtk.events_pending():
+                Gtk.main_iteration()
         self.progress_window = Gtk.Dialog(title="Import/export progress",
                                           parent=self.window)
 
@@ -267,6 +270,7 @@ class PlaylistLoadSavePlugin(GObject.Object, Peas.Activatable):
         self.progress_window.show_all()
 
     def update_fraction(self, fraction):
-
+        while Gtk.events_pending():
+                Gtk.main_iteration()
         self.progress_bar.pulse()
         self.progress_bar.set_fraction(fraction)
