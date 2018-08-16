@@ -1,15 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Generated with glade 3.16.1 -->
+<!-- Generated with glade 3.22.1 -->
 <interface>
+  <requires lib="gtk+" version="3.10"/>
   <object class="GtkBox" id="config">
     <property name="visible">True</property>
     <property name="can_focus">False</property>
+    <property name="margin_left">12</property>
+    <property name="margin_right">12</property>
     <property name="orientation">vertical</property>
     <property name="spacing">2</property>
     <child>
       <object class="GtkLabel" id="label1">
         <property name="visible">True</property>
         <property name="can_focus">False</property>
+        <property name="margin_top">4</property>
+        <property name="margin_bottom">4</property>
         <property name="label" translatable="yes">WARNING! Importing playlists deletes all current static playlists from Rhythmbox, so export first!</property>
         <property name="justify">center</property>
         <property name="wrap">True</property>
@@ -20,7 +25,7 @@
       </object>
       <packing>
         <property name="expand">False</property>
-        <property name="fill">True</property>
+        <property name="fill">False</property>
         <property name="position">0</property>
       </packing>
     </child>
@@ -51,8 +56,6 @@
       <object class="GtkBox" id="box2">
         <property name="visible">True</property>
         <property name="can_focus">False</property>
-        <property name="halign">center</property>
-        <property name="valign">center</property>
         <child>
           <object class="GtkEntry" id="path_display">
             <property name="visible">True</property>
@@ -82,6 +85,22 @@
         <property name="expand">False</property>
         <property name="fill">True</property>
         <property name="position">3</property>
+      </packing>
+    </child>
+    <child>
+      <object class="GtkCheckButton" id="import_skip_check">
+        <property name="label" translatable="yes">skip matching playlist names on import</property>
+        <property name="visible">True</property>
+        <property name="can_focus">True</property>
+        <property name="receives_default">False</property>
+        <property name="margin_top">8</property>
+        <property name="margin_bottom">8</property>
+        <property name="draw_indicator">True</property>
+      </object>
+      <packing>
+        <property name="expand">False</property>
+        <property name="fill">True</property>
+        <property name="position">4</property>
       </packing>
     </child>
   </object>

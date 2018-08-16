@@ -6,5 +6,10 @@
             <summary>Folder to import to or export from.</summary>
             <description>Defines the folder that the batch operations are applied to/from. There is no recursion into subfolders.</description>
         </key>
+        <key type="b" name="import-skip">
+            <default>false</default>
+            <summary>Do not delete existing playlists that match  names using "Import Playlists".</summary>
+            <description>Default behavious is to clear all non-auto playlists and import from the set folder. If set this will not delete matching playlist names.</description>
+        </key>
     </schema>
 </schemalist>

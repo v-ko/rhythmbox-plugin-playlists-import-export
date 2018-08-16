@@ -37,7 +37,7 @@ class PlaylistLoadSavePlugin(GObject.Object, Peas.Activatable):
         self.action3 = None
         self.progress_window = None
         self.progress_bar = None
-        self.messagedialog = None
+        self.message_dialog = None
         self.plugin_info = "playlists_ie"
 
     def do_activate(self):
@@ -88,6 +88,7 @@ class PlaylistLoadSavePlugin(GObject.Object, Peas.Activatable):
     def import_playlists(self, action, parameter, shell):
         settings = Gio.Settings.new("org.gnome.rhythmbox.plugins.playlists_ie")
         folder = settings.get_string("ie-folder")  # get the import-export folder
+        importskip = settings.get_boolean("import-skip")  # get import-skip boolean from settings
         if not os.path.isdir(folder):
             self.warn_for_no_present_dir()
             return
@@ -106,6 +107,8 @@ class PlaylistLoadSavePlugin(GObject.Object, Peas.Activatable):
             if isinstance(playlist, RB.AutoPlaylistSource):  # keep only auto playlists
                 if playlist.props.name == "Unnamed playlist":  # this name is used for the newly imported playlists
                     playlist.props.name = "Unnamed playlist_"
+            elif importskip and (playlist.props.name + ".m3u") in os.listdir(folder):
+                logging.error("Skipping existing playlist " + playlist.props.name)
             else:
                 logging.error("deleting " + playlist.props.name)
                 pl_man.delete_playlist(playlist.props.name)
@@ -125,8 +128,9 @@ class PlaylistLoadSavePlugin(GObject.Object, Peas.Activatable):
 
             while Gtk.events_pending():
                 Gtk.main_iteration()
-
-            if pl_file.endswith(".m3u"):
+            if importskip and pl_file[:-4] in pl_man.get_playlists():
+                logging.error("Skipping file import " + pl_file)
+            elif pl_file.endswith(".m3u"):
                 pl_name = pl_file[:-4]
                 pl_uri = os.path.join(folder, pl_name)
                 pl_uri = "file://" + pl_uri + ".m3u"
@@ -225,25 +229,25 @@ class PlaylistLoadSavePlugin(GObject.Object, Peas.Activatable):
     def warn_not_a_playlist(self):
 
         logging.error("Not viewing a playlist")
-        self.messagedialog = Gtk.MessageDialog(parent=self.window,
-                                               flags=Gtk.DialogFlags.MODAL,
-                                               type=Gtk.MessageType.WARNING,
-                                               buttons=Gtk.ButtonsType.OK,
-                                               message_format="Please select a static playlist to update")
-        self.messagedialog.connect("response", self.destroy_warning)
-        self.messagedialog.show()
+        self.message_dialog = Gtk.MessageDialog(parent=self.window,
+                                                flags=Gtk.DialogFlags.MODAL,
+                                                type=Gtk.MessageType.WARNING,
+                                                buttons=Gtk.ButtonsType.OK,
+                                                message_format="Please select a static playlist to update")
+        self.message_dialog.connect("response", self.destroy_warning)
+        self.message_dialog.show()
 
     def warn_for_no_present_dir(self):
 
         logging.error("reached warning for dir")
-        messagedialog = Gtk.MessageDialog(parent=self.window,
-                                          flags=Gtk.DialogFlags.MODAL,
-                                          type=Gtk.MessageType.WARNING,
-                                          buttons=Gtk.ButtonsType.OK,
-                                          message_format="Please first select a valid directory." +
-                                                         " (Plugins->Preferences)")
-        messagedialog.connect("response", self.destroy_warning)
-        messagedialog.show()
+        message_dialog = Gtk.MessageDialog(parent=self.window,
+                                           flags=Gtk.DialogFlags.MODAL,
+                                           type=Gtk.MessageType.WARNING,
+                                           buttons=Gtk.ButtonsType.OK,
+                                           message_format=("Please first select a valid directory." +
+                                                           " (Plugins->Preferences)"))
+        message_dialog.connect("response", self.destroy_warning)
+        message_dialog.show()
 
     def destroy_warning(self, widget, arg1):
         widget.destroy()
