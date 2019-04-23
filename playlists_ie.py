@@ -14,11 +14,13 @@
 import os
 import rb
 import logging
+import filecmp
 
 from gi.repository import Gio, GObject, Peas, RB, Gtk
 
 from playlists_ie_prefs import PlaylistsIOConfigureDialog
 
+debug = 0
 
 class PlaylistLoadSavePlugin(GObject.Object, Peas.Activatable):
     __gtype_name__ = 'PlaylistLoadSavePlugin'
@@ -34,7 +36,6 @@ class PlaylistLoadSavePlugin(GObject.Object, Peas.Activatable):
         self.window = None
         self.action1 = None
         self.action2 = None
-        self.action3 = None
         self.progress_window = None
         self.progress_bar = None
         self.messagedialog = None
@@ -49,30 +50,14 @@ class PlaylistLoadSavePlugin(GObject.Object, Peas.Activatable):
         self.action1.connect("activate", self.import_playlists, shell)
         self.action2 = Gio.SimpleAction.new("export-playlists", None)
         self.action2.connect("activate", self.export_playlists, shell)
-        self.action3 = Gio.SimpleAction(name="update-playlist")
-        self.action3.connect("activate", self.update_playlist, shell)
-
         self.window.add_action(self.action1)
         self.window.add_action(self.action2)
-        self.window.add_action(self.action3)
 
         item1 = Gio.MenuItem.new(label="Import playlists", detailed_action="win.import-playlists")
         item2 = Gio.MenuItem.new(label="Export playlists", detailed_action="win.export-playlists")
-        item3 = Gio.MenuItem.new(label="Update this playlist", detailed_action="win.update-playlist")
 
         app.add_plugin_menu_item("tools", "import-playlists", item1)
         app.add_plugin_menu_item("tools", "export-playlists", item2)
-        app.add_plugin_menu_item("tools", "update-playlist", item3)
-        
-        # create menu item for rightclick in playlist view
-        item = Gio.MenuItem()
-        item.set_label("Update this playlist")
-        item.set_detailed_action("app.update-playlist")
-
-        # add plugin menu item
-        for menu_name in PlaylistLoadSavePlugin._menu_names:
-            app.add_plugin_menu_item(menu_name, "Update this playlist", item)
-        app.add_action(self.action3)
 
     def do_deactivate(self):
         shell = self.object
@@ -83,12 +68,38 @@ class PlaylistLoadSavePlugin(GObject.Object, Peas.Activatable):
         app.remove_action("export-playlists")
         self.action1 = None
         self.action2 = None
-        self.action3 = None
+
+
+    def export_to_tmp(self, playlist_name, shell):
+        settings = Gio.Settings.new("org.gnome.rhythmbox.plugins.playlists_ie")
+        ie_folder = settings.get_string("ie-folder")
+        pl_man = shell.props.playlist_manager
+
+        if not os.path.isdir(ie_folder):
+            self.warn_for_no_present_dir()
+            return
+
+        pl_name = playlist_name
+        pl_uri = "file://" + os.path.join(ie_folder, "tmp") + ".m3u"
+        if debug: logging.error("Exporting to tmp: " + pl_name)
+        pl_man.export_playlist(pl_name, pl_uri, 1)
+
+
+    def parse_m3u_to_relative(self, root_folder, playlist_path):
+        output = ""
+        with open(playlist_path) as playlist_file:
+            for line in playlist_file:
+                if not line.startswith("#"):
+                    output = output + os.path.relpath(line, root_folder)
+
+        with open(playlist_path, "w+") as playlist_file:
+            playlist_file.write(output)
+
 
     def import_playlists(self, action, parameter, shell):
         settings = Gio.Settings.new("org.gnome.rhythmbox.plugins.playlists_ie")
-        folder = settings.get_string("ie-folder")  # get the import-export folder
-        if not os.path.isdir(folder):
+        ie_folder = settings.get_string("ie-folder")
+        if not os.path.isdir(ie_folder):
             self.warn_for_no_present_dir()
             return
 
@@ -97,104 +108,102 @@ class PlaylistLoadSavePlugin(GObject.Object, Peas.Activatable):
         pl_list = pl_man.get_playlists()
         pl_count = len(pl_list)
         processed_pl_count = 0
-
-        for playlist in pl_list:
-
-            while Gtk.events_pending():
-                Gtk.main_iteration()
-
-            if isinstance(playlist, RB.AutoPlaylistSource):  # keep only auto playlists
-                if playlist.props.name == "Unnamed playlist":  # this name is used for the newly imported playlists
-                    playlist.props.name = "Unnamed playlist_"
-            else:
-                logging.error("deleting " + playlist.props.name)
-                pl_man.delete_playlist(playlist.props.name)
-
-            processed_pl_count = processed_pl_count+1
-            self.update_fraction(1 - processed_pl_count / pl_count)
-
         pl_file_count = 0
         processed_pl_files = 0
 
-        for pl_file in os.listdir(folder):
+        #Get the internal plalists names to watch for deleted ones
+        internal_playlists = []
+        for playlist in pl_list:
+            # this name is used for the newly imported playlists
+            if playlist.props.name == "Unnamed playlist":
+                playlist.props.name = "Unnamed playlist_"
 
+            if playlist.props.name in internal_playlists:
+                pl_man.delete_playlist(playlist.props.name) # Clear duplicates
+                playlist.props
+            # Handle only static playlists (skip auto pl)
+            if not isinstance(playlist, RB.AutoPlaylistSource):
+                internal_playlists.append(playlist.props.name)
+
+        # Get the playlist count in order to display the progress bar properly
+        for pl_file in os.listdir(ie_folder):
             if pl_file.endswith(".m3u"):
                 pl_file_count = pl_file_count+1
 
-        for pl_file in os.listdir(folder):
+        #Start parsing playlist files
+        for pl_file in os.listdir(ie_folder):
 
-            while Gtk.events_pending():
+            while Gtk.events_pending(): # Update the UI
                 Gtk.main_iteration()
 
             if pl_file.endswith(".m3u"):
+                # Metadata
                 pl_name = pl_file[:-4]
-                pl_uri = os.path.join(folder, pl_name)
-                pl_uri = "file://" + pl_uri + ".m3u"
-                pl_man.parse_file(pl_uri)
-                logging.error("importing " + pl_uri)
+                tmp_path = os.path.join(ie_folder, "tmp.m3u")
+                pl_path = os.path.join(ie_folder, pl_name + ".m3u")
+                pl_uri = "file://" + pl_path
 
+                # Check for changes (because importing is slow)
+                # Export to tmp.m3u and import only if there's a difference to the import candidate
+                if pl_name in internal_playlists:
+                    internal_playlists.remove(pl_name)
+                    self.export_to_tmp(pl_name, shell)
+                    # Touch the tmp file if it's not created (e.g. when pl is empty)
+                    if not os.path.exists(tmp_path):
+                        open(tmp_path, "a").close()
+                    self.parse_m3u_to_relative(ie_folder, tmp_path)
+
+                    # If there is a change in the playlist - reimport
+                    if not filecmp.cmp(tmp_path, pl_path):
+                        if debug: logging.error("deleting " + pl_name)
+                        pl_man.delete_playlist(pl_name)
+                        if debug: logging.error("importing " + pl_uri)
+                        pl_man.parse_file(pl_uri)
+                    os.remove(tmp_path) # Clear the tmp file
+
+                else: # Import a pl missing from the internal list
+                    if debug: logging.error("importing " + pl_uri)
+                    pl_man.parse_file(pl_uri)
+
+                # Correct the name of the imported playlist
                 for playlist in pl_man.get_playlists():
-                    if playlist.props.name == "Unnamed playlist":  # that's the one we imported last , so set it's name
+                    if playlist.props.name == "Unnamed playlist":
                         playlist.props.name = pl_name
 
+                # Update the progress bar
                 processed_pl_files = processed_pl_files + 1
                 self.update_fraction(processed_pl_files / pl_file_count)
 
+        # If anything is left in the internal pl list: it's been removed externally, so delete it
+        for pl in internal_playlists:
+            if debug: logging.error("deleting " + pl)
+            pl_man.delete_playlist(pl)
         self.progress_window.destroy()
 
-    def import_single_playlist(self, playlist, shell):
-        settings = Gio.Settings.new("org.gnome.rhythmbox.plugins.playlists_ie")
-        folder = settings.get_string("ie-folder")  # get the import-export folder
-        if not os.path.isdir(folder):
-            self.warn_for_no_present_dir()
-            return
+        # It's impossible to circumvent this sht
+        # Add and remove a playlist in order to avoid a UI bug (the last imported playlist gets selected for renaming)
+        #tmp_pl = os.path.join(ie_folder, "tmp_tmp_tmp_tmp.m3u")
+        #with open(tmp_pl, "a") as tmp:
+        #    tmp.write("./mock.mp3")
+        #open(tmp_pl, "a").close()
+        #os.copy(os.listdir(ie_folder)[0], tmp_pl) # Use the first playlist as a
+        #pl_man.parse_file("file://" + tmp_pl)
+        #pl_man.create_static_playlist("tmp_tmp_tmp_tmp2")
+        #pl_man.delete_playlist("Unnamed playlist")
+        #for playlist in pl_man.get_playlists():
+        #    if playlist.props.name == "Unnamed playlist":  # that's the one we imported last , so set it's name
+        #        playlist.props.name = "tmp_tmp_tmp_tmp"
+        #if debug: logging.error("deleting tmp")
+        #pl_man.delete_playlist("tmp_tmp_tmp_tmp")
+        #pl_man.delete_playlist("tmp_tmp_tmp_tmp2")
 
-        pl_man = shell.props.playlist_manager
-        processed_pl_files = 0
+        #os.remove(tmp_pl)
 
-        self.create_progress_bar_win()
-        for pl_file in os.listdir(folder):
-            while Gtk.events_pending():
-                Gtk.main_iteration()
-
-            if pl_file.lower().endswith(".m3u") and pl_file[:-4] == playlist:
-                pl_man.delete_playlist(playlist)
-                pl_name = pl_file[:-4]
-                pl_uri = os.path.join(folder, pl_name)
-                pl_uri = "file://" + pl_uri + ".m3u"
-                pl_man.parse_file(pl_uri)
-                logging.info("importing " + pl_uri)
-
-                for playlist in pl_man.get_playlists():
-                    if playlist.props.name == "Unnamed playlist":  # that's the one we imported last, so set it's name
-                        playlist.props.name = pl_name
-
-                processed_pl_files = processed_pl_files + 1
-            # there is always one file
-            self.update_fraction(processed_pl_files / 1)
-
-        while Gtk.events_pending():
-            Gtk.main_iteration()
-        self.progress_window.destroy()
-
-    def update_playlist(self, action, parameter, shell):
-        """ get your currently selected playlist and run import_single_playlist """
-        page = shell.props.selected_page
-        if not hasattr(page, "get_entry_view"):
-            return
-        pagetype = shell.props.selected_page.get_name()
-        playlist = shell.props.selected_page.get_property('name')
-        # self.process_selection(selection)
-        if pagetype == 'RBStaticPlaylistSource':
-            self.import_single_playlist(playlist, shell)
-        else:
-            self.warn_not_a_playlist()
-        return
 
     def export_playlists(self, action, parameter, shell):
         settings = Gio.Settings.new("org.gnome.rhythmbox.plugins.playlists_ie")
-        folder = settings.get_string("ie-folder")  # get the import-export folder
-        if not os.path.isdir(folder):
+        ie_folder = settings.get_string("ie-folder")
+        if not os.path.isdir(ie_folder):
             self.warn_for_no_present_dir()
             return
 
@@ -204,38 +213,46 @@ class PlaylistLoadSavePlugin(GObject.Object, Peas.Activatable):
         pl_list = pl_man.get_playlists()
         pl_count = len(pl_list)
         processed_pl_count = 0
+        existing_m3us = []
+
+        # Prepare a list of the existing m3u files
+        for file in os.listdir(ie_folder):
+            if file.endswith(".m3u"):
+                existing_m3us.append(os.path.join(ie_folder,file))
 
         for playlist in pl_list:
 
+            # Update the UI
             while Gtk.events_pending():
                 Gtk.main_iteration()
 
+            # Only for static playlists (omit automatic ones)
             if isinstance(playlist, RB.StaticPlaylistSource):
                 pl_name = playlist.props.name
-                pl_uri = os.path.join(folder, pl_name)
-                pl_uri = "file://" + pl_uri + ".m3u"
-                logging.error("exporting " + pl_name)
-                pl_man.export_playlist(pl_name, pl_uri, 1)
+                playlist_path = os.path.join(ie_folder, pl_name) + ".m3u"
+                tmp_path = os.path.join(ie_folder, "tmp.m3u")
 
+                self.export_to_tmp(pl_name, shell)
+                if os.path.isfile(tmp_path):
+                    if debug: logging.error("Parsing and renaming tmp "+ tmp_path + " to: " + playlist_path)
+                    self.parse_m3u_to_relative(ie_folder, tmp_path)
+                    if playlist_path in existing_m3us:
+                        existing_m3us.remove(playlist_path)
+                    os.rename(tmp_path, playlist_path)
+
+                # Update progress bar
                 processed_pl_count = processed_pl_count + 1
                 self.update_fraction(processed_pl_count / pl_count)
 
+        # The m3us left in the list are for removal (they were probably deleted in RB)
+        for m3u in existing_m3us:
+            os.rename(m3u, m3u+".deleted")
+
         self.progress_window.destroy()
-
-    def warn_not_a_playlist(self):
-
-        logging.error("Not viewing a playlist")
-        self.messagedialog = Gtk.MessageDialog(parent=self.window,
-                                               flags=Gtk.DialogFlags.MODAL,
-                                               type=Gtk.MessageType.WARNING,
-                                               buttons=Gtk.ButtonsType.OK,
-                                               message_format="Please select a static playlist to update")
-        self.messagedialog.connect("response", self.destroy_warning)
-        self.messagedialog.show()
 
     def warn_for_no_present_dir(self):
 
-        logging.error("reached warning for dir")
+        if debug: logging.error("reached warning for dir")
         messagedialog = Gtk.MessageDialog(parent=self.window,
                                           flags=Gtk.DialogFlags.MODAL,
                                           type=Gtk.MessageType.WARNING,
